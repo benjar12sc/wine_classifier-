@@ -1,0 +1,20 @@
+version: '3.8'
+services:
+  train:
+    build: .
+    command: python scripts/train_svm.py
+    volumes:
+      - .:/app
+    environment:
+      - PYTHONUNBUFFERED=1
+  api:
+    build: .
+    command: python scripts/serve_svm_api.py
+    ports:
+      - "8000:8000"
+    depends_on:
+      - train
+    volumes:
+      - .:/app
+    environment:
+      - PYTHONUNBUFFERED=1
