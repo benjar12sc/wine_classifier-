@@ -9,6 +9,7 @@ import joblib
 from pathlib import Path
 import sqlite3
 from functools import wraps
+from functools import lru_cache
 import time
 
 # Load model and scaler
@@ -75,7 +76,8 @@ def check_admin_token(authorization: str = Header(...)):
     if authorization != f"Bearer {ADMIN_TOKEN}":
         raise HTTPException(status_code=401, detail="Invalid or missing admin token.")
 
-def rate_limited():
+@lru_cache(maxsize=32)
+def rate_limited_cached():
     with sqlite3.connect(DB_PATH) as conn:
         c = conn.cursor()
         c.execute("SELECT last_add FROM admin_rate_limit WHERE id=1")
@@ -85,6 +87,13 @@ def rate_limited():
             raise HTTPException(status_code=429, detail="Rate limit exceeded. Try again later.")
         c.execute("UPDATE admin_rate_limit SET last_add=? WHERE id=1", (now,))
         conn.commit()
+
+def rate_limited():
+    # Call the cached version, but always clear cache after to ensure up-to-date checks
+    try:
+        rate_limited_cached()
+    finally:
+        rate_limited_cached.cache_clear()
 
 def get_user_token(authorization: str = Header(...)):
     if not authorization.startswith("Bearer "):
